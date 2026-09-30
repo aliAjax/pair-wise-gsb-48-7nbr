@@ -2,10 +2,14 @@
 from typing import Any, Dict, Iterable, Tuple
 
 from .domain import Actor, Conflict, ValidationError, boolean, choice, integer, number, text, text_list
+from .receipts import CUSTODY_REVIEW_ROLE, CUSTODY_SUBMIT_ROLE
 
 
 INITIAL_STATE = "captured"
 CREATE_ROLES = {'trader'}
+CUSTODY_ROLES = {CUSTODY_SUBMIT_ROLE, CUSTODY_REVIEW_ROLE}
+# 回执提交（存管专员）与回执复核（存管主管）的角色映射
+RECEIPT_ACTION_ROLES = {'submit_receipts': {CUSTODY_SUBMIT_ROLE, CUSTODY_REVIEW_ROLE}, 'review_receipt': {CUSTODY_REVIEW_ROLE}}
 ACTION_ROLES = {'apply_corporate': {'corporate_actions'}, 'approve': {'settlement_officer'}, 'settle': {'settlement_officer'}, 'fail': {'settlement_officer'}, 'reverse': {'corporate_actions', 'settlement_officer'}}
 TRANSITIONS = {'apply_corporate': {'captured': 'adjusted'}, 'approve': {'captured': 'approved', 'adjusted': 'approved'}, 'settle': {'approved': 'settled'}, 'fail': {'approved': 'failed'}, 'reverse': {'settled': 'reversed', 'failed': 'reversed'}}
 
@@ -14,7 +18,7 @@ class DomainRules:
     INITIAL_STATE = INITIAL_STATE
 
     def known_role(self, role: str) -> bool:
-        all_roles = set(CREATE_ROLES)
+        all_roles = set(CREATE_ROLES) | set(CUSTODY_ROLES)
         for roles in ACTION_ROLES.values():
             all_roles.update(roles)
         return role == "admin" or role in all_roles
@@ -24,6 +28,9 @@ class DomainRules:
 
     def role_can_action(self, role: str, action: str) -> bool:
         return role == "admin" or role in ACTION_ROLES.get(action, set())
+
+    def role_can_receipt_action(self, role: str, action: str) -> bool:
+        return role == "admin" or role in RECEIPT_ACTION_ROLES.get(action, set())
 
     def validate_create(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         p = dict(payload)

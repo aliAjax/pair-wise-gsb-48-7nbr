@@ -23,6 +23,13 @@ class Conflict(DomainError):
     code = "conflict"
 
 
+class ReceiptReviewPending(Conflict):
+    """存在引用缺失或版本变化的待复核回执，审批与交收必须暂停。"""
+
+    status = 409
+    code = "receipt_pending_review"
+
+
 class PermissionDenied(DomainError):
     status = 403
     code = "permission_denied"
