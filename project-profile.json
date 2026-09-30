@@ -1,0 +1,11 @@
+{
+  "projectId": "pair-wise-gsb-48",
+  "projectName": "pair-wise-gsb-48",
+  "category": "地狱 Python 模块化项目",
+  "businessDomain": "证券结算",
+  "projectForm": "完整项目",
+  "codeScope": "backend, frontend",
+  "languages": ["Python", "HTML", "CSS", "JavaScript"],
+  "summary": "证券结算与企业行动处理服务，覆盖净额结算、交收完整性和公司行动调整。",
+  "containerized": false
+}
