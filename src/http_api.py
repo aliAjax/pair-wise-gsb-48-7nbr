@@ -12,6 +12,13 @@ from .domain import Actor, DomainError, PermissionDenied, ValidationError
 RECORD_RE = re.compile(r"^/api/records/(\d+)$")
 ACTION_RE = re.compile(r"^/api/records/(\d+)/actions/([a-z_]+)$")
 AUDIT_RE = re.compile(r"^/api/records/(\d+)/audit$")
+BATCH_COLLECTION_RE = re.compile(r"^/api/receipt-batches$")
+BATCH_RE = re.compile(r"^/api/receipt-batches/([A-Za-z0-9_.-]+)$")
+BATCH_AUDIT_RE = re.compile(r"^/api/receipt-batches/([A-Za-z0-9_.-]+)/audit$")
+BATCH_RECONCILE_RE = re.compile(r"^/api/receipt-batches/([A-Za-z0-9_.-]+)/reconcile$")
+RECEIPT_RE = re.compile(r"^/api/receipts/(\d+)$")
+RECEIPT_REVIEW_RE = re.compile(r"^/api/receipts/(\d+)/review$")
+RECEIPTS_RE = re.compile(r"^/api/receipts$")
 
 
 def make_handler(service: Any, static_dir: Path):
@@ -33,7 +40,7 @@ def make_handler(service: Any, static_dir: Path):
                 length = int(self.headers.get("Content-Length", "0"))
             except ValueError as exc:
                 raise ValidationError("Content-Length无效") from exc
-            if length > 1024 * 1024:
+            if length > 4 * 1024 * 1024:
                 raise ValidationError("请求体过大")
             raw = self.rfile.read(length) if length else b"{}"
             try:
@@ -87,6 +94,33 @@ def make_handler(service: Any, static_dir: Path):
                 if parsed.path == "/api/stats":
                     self._send(200, service.stats(self._actor()))
                     return
+                if BATCH_COLLECTION_RE.match(parsed.path):
+                    query = parse_qs(parsed.query)
+                    self._send(200, {"items": service.list_batches(self._actor(), limit=int(query.get("limit", ["100"])[0]))})
+                    return
+                match = BATCH_AUDIT_RE.match(parsed.path)
+                if match:
+                    self._send(200, service.batch_audit(self._actor(), match.group(1)))
+                    return
+                match = BATCH_RE.match(parsed.path)
+                if match:
+                    self._send(200, service.get_batch(self._actor(), match.group(1)))
+                    return
+                if RECEIPTS_RE.match(parsed.path):
+                    query = parse_qs(parsed.query)
+                    receipts = service.list_receipts(
+                        self._actor(),
+                        batch_no=query.get("batch_no", [None])[0],
+                        reference=query.get("reference", [None])[0],
+                        status=query.get("status", [None])[0],
+                        limit=int(query.get("limit", ["100"])[0]),
+                    )
+                    self._send(200, {"items": receipts})
+                    return
+                match = RECEIPT_RE.match(parsed.path)
+                if match:
+                    self._send(200, service.get_receipt(self._actor(), int(match.group(1))))
+                    return
                 self._send(404, {"error": "not_found", "message": "路径不存在"})
             except Exception as exc:
                 self._handle_error(exc)
@@ -106,6 +140,20 @@ def make_handler(service: Any, static_dir: Path):
                         raise ValidationError("expected_version必须是整数")
                     record = service.act(self._actor(), int(match.group(1)), version, match.group(2), body.get("data", {}))
                     self._send(200, record)
+                    return
+                if BATCH_COLLECTION_RE.match(parsed.path):
+                    result = service.ingest_receipts(self._actor(), body.get("batch_no", ""), body.get("receipts", []))
+                    self._send(201 if not result.get("already_exists") else 200, result)
+                    return
+                match = BATCH_RECONCILE_RE.match(parsed.path)
+                if match:
+                    result = service.reconcile_batch(self._actor(), match.group(1))
+                    self._send(200, result)
+                    return
+                match = RECEIPT_REVIEW_RE.match(parsed.path)
+                if match:
+                    receipt = service.resolve_review(self._actor(), int(match.group(1)), body.get("decision", ""), body.get("note", ""))
+                    self._send(200, receipt)
                     return
                 self._send(404, {"error": "not_found", "message": "路径不存在"})
             except Exception as exc:

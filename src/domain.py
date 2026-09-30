@@ -23,6 +23,19 @@ class Conflict(DomainError):
     code = "conflict"
 
 
+class BatchLocked(Conflict):
+    code = "batch_locked"
+
+
+class BatchCompleted(Conflict):
+    code = "batch_completed"
+
+
+class RetryExhausted(DomainError):
+    status = 503
+    code = "retry_exhausted"
+
+
 class PermissionDenied(DomainError):
     status = 403
     code = "permission_denied"
